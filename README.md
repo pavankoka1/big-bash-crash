@@ -1,4 +1,24 @@
-# Getting Started with Create React App
+# Ocean Scene - Big Bass Crash
+
+A realistic ocean scene created with HTML5 Canvas featuring animated fish, a floating boat, and dynamic water effects.
+
+## Features
+
+- **Realistic Sky**: 40% of the screen with beautiful blue gradient sky
+- **Ocean Water**: 60% of the screen with sea blue to sea green gradient
+- **Animated Fish**: Fish images moving from right to left with random sizes and speeds
+- **Floating Boat**: Boat positioned at the water surface with subtle floating animation
+- **Wave Effects**: Dynamic wave patterns on the water surface
+- **Responsive**: Adapts to different screen sizes
+
+## Assets Required
+
+Place the following images in the `public/assets/` directory:
+
+- `fish.png` - Fish image for the swimming fish
+- `boat.png` - Boat image for the floating boat
+
+## Getting Started
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
