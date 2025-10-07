@@ -2,10 +2,10 @@
 export const OCEAN_CONFIG = {
   // Canvas and rendering
   CANVAS: {
-    FISH_SPAWN_INTERVAL: 800, // ms
+    FISH_SPAWN_INTERVAL: 1200, // ms - increased for better performance
     WAVE_DAMPING: 0.08,
     BOAT_HOVER_DAMPING: 0.15,
-    FISH_COUNT_INITIAL: 6,
+    FISH_COUNT_INITIAL: 4, // reduced for better performance
     MAX_FISH_ATTEMPTS: 10,
   },
 
@@ -49,8 +49,8 @@ export const OCEAN_CONFIG = {
   FISH: {
     SIZE_MIN_RATIO: 0.02,
     SIZE_MAX_RATIO: 0.04,
-    SPEED_MIN: 1.5,
-    SPEED_MAX: 3.0,
+    SPEED_MIN: 3.0, // doubled from 1.5
+    SPEED_MAX: 6.0, // doubled from 3.0
     OPACITY_MIN: 0.6,
     OPACITY_MAX: 1.0,
     SPAWN_OFFSET: 50,
@@ -98,12 +98,12 @@ export const OCEAN_CONFIG = {
 
   // Net properties
   NET: {
-    LINE_SPACING: 4,
+    LINE_SPACING: 6, // increased for better performance
     LINE_WIDTH: 1,
     STROKE_WIDTH: 3,
     POLE_WIDTH: 4,
     ALPHA: 0.4,
-    WAVE_DISTORTION_AMPLITUDE: 3,
+    WAVE_DISTORTION_AMPLITUDE: 2, // reduced for better performance
     WAVE_DISTORTION_FREQUENCY_X: 0.02,
     WAVE_DISTORTION_FREQUENCY_Y: 0.03,
     WAVE_DISTORTION_SPEED_X: 0.008,
@@ -112,16 +112,18 @@ export const OCEAN_CONFIG = {
 
   // Smoke effect
   SMOKE: {
-    PARTICLE_COUNT: 8,
-    LIFE_MIN: 60,
-    LIFE_MAX: 100,
-    SIZE_MIN: 2,
-    SIZE_MAX: 5,
-    VELOCITY_X_RANGE: 0.5,
-    VELOCITY_Y_MIN: 0.5,
-    VELOCITY_Y_MAX: 2.5,
-    SPREAD: 10,
-    ALPHA: 0.6,
+    PARTICLE_COUNT: 75, // 5x more particles (15 * 5)
+    LIFE_MIN: 80,
+    LIFE_MAX: 120,
+    SIZE_MIN: 3,
+    SIZE_MAX: 8,
+    VELOCITY_X_RANGE: 1.0, // increased for wind effect
+    VELOCITY_Y_MIN: 0.8,
+    VELOCITY_Y_MAX: 3.0,
+    SPREAD: 15, // increased spread
+    ALPHA: 0.7,
+    EXPANSION_RATE: 0.02, // particles grow as they rise
+    WIND_EFFECT: 0.3, // wind pushes particles sideways
   },
 
   // Boat properties
@@ -169,4 +171,3 @@ export const WAVE_CALCULATIONS = {
     LAYER_3_SPEED: 0.008,
   },
 } as const;
-

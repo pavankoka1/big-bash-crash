@@ -1,19 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { OCEAN_CONFIG } from "../constants/oceanConstants";
 import { drawBoat, drawFishingNet } from "../utils/boatAndNet";
-import {
-  drawCaughtFish,
-  drawFish,
-  drawFishCount,
-  drawParabolaDebug,
-  drawTrapPositionIndicator,
-} from "../utils/fishDrawing";
+import { drawCaughtFish, drawFish, drawFishCount } from "../utils/fishDrawing";
 import {
   Fish,
   SmokeParticle,
   Wave,
   calculateNetPosition,
-  calculateNextTrapPosition,
   createFish,
   createSmokeEffect,
   drawAtmosphericWaves,
@@ -36,6 +29,16 @@ const OceanScene: React.FC = () => {
   const [waves, setWaves] = useState<Wave[]>([]);
   const [imagesLoaded, setImagesLoaded] = useState(false);
   const nextTrapPositionRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Game state
+  const [gameState, setGameState] = useState<
+    "playing" | "detaching" | "gameOver"
+  >("playing");
+  const [gameTime, setGameTime] = useState(0);
+  const [finalFishCount, setFinalFishCount] = useState(0);
+  const gameStartTimeRef = useRef<number>(0);
+  const detachmentStartTimeRef = useRef<number>(0);
+  const gameEndedRef = useRef<boolean>(false);
 
   // Load images
   useEffect(() => {
@@ -140,6 +143,41 @@ const OceanScene: React.FC = () => {
     const fishSpawnInterval = OCEAN_CONFIG.CANVAS.FISH_SPAWN_INTERVAL;
 
     const animate = (currentTime: number) => {
+      // Initialize game timer on first frame
+      if (gameStartTimeRef.current === 0) {
+        gameStartTimeRef.current = currentTime;
+      }
+
+      // Calculate game time
+      const elapsedTime = currentTime - gameStartTimeRef.current;
+      const gameTimeSeconds = Math.floor(elapsedTime / 1000);
+
+      // Update game time state
+      if (gameTimeSeconds !== gameTime) {
+        setGameTime(gameTimeSeconds);
+        console.log(
+          `Timer: ${gameTimeSeconds}s (elapsed: ${elapsedTime}ms), State: ${gameState}`
+        );
+      }
+
+      // Check if 10 seconds have passed
+      if (gameTimeSeconds >= 10 && !gameEndedRef.current) {
+        console.log(
+          `🎮 GAME ENDING! Time: ${gameTimeSeconds}s, State: ${gameState}, gameEnded: ${gameEndedRef.current}`
+        );
+        gameEndedRef.current = true;
+        setGameState("detaching");
+        setFinalFishCount(caughtFishRef.current.length);
+        detachmentStartTimeRef.current = currentTime;
+      }
+
+      // Check if detachment animation is complete (3 seconds)
+      if (
+        gameEndedRef.current &&
+        currentTime - detachmentStartTimeRef.current > 3000
+      ) {
+        setGameState("gameOver");
+      }
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -158,102 +196,106 @@ const OceanScene: React.FC = () => {
       // Update fish positions
       fishRef.current = updateFishPositions(fishRef.current);
 
-      // Spawn new fish
-      if (currentTime - lastFishSpawn > fishSpawnInterval) {
-        fishRef.current.push(
-          createFish(canvas.width, canvas.height, fishRef.current)
+      // Spawn new fish only during playing state
+      if (
+        gameState === "playing" &&
+        currentTime - lastFishSpawn > fishSpawnInterval
+      ) {
+        const newFish = createFish(
+          canvas.width,
+          canvas.height,
+          fishRef.current
         );
+        fishRef.current.push(newFish);
         lastFishSpawn = currentTime;
-        console.log("Spawned new fish, total fish:", fishRef.current.length);
       }
 
       // Process fish trapping and drawing
-      const netPosition = calculateNetPosition(
+      let netPosition = calculateNetPosition(
         canvas.width,
         canvas.height,
         currentTime
       );
-      const { netX, netY, netWidth, netHeight } = netPosition;
+      let { netX, netY, netWidth, netHeight } = netPosition;
 
-      // Process each fish for trapping
-      for (let i = fishRef.current.length - 1; i >= 0; i--) {
-        const fish = fishRef.current[i];
-
-        // ADDITIONAL SAFETY: If fish is blurred but somehow still in active fish array,
-        // force it to be trapped immediately (this should never happen but just in case)
-        if (fish.isBlurred) {
-          console.log(
-            `🚨 SAFETY TRAP: Fish ${i} is blurred but still active! Forcing trap...`
-          );
-
-          // Force trap this fish immediately
-          const emergencyTrapPos = calculateNextTrapPosition(
-            netX,
-            netY,
-            netWidth,
-            netHeight,
-            caughtFishRef.current.length
-          );
-
-          const caughtFish = {
-            ...fish,
-            caughtTime: currentTime,
-            x: emergencyTrapPos.x,
-            y: emergencyTrapPos.y,
-            isBlurred: true,
-          };
-
-          fishRef.current.splice(i, 1);
-          caughtFishRef.current.push(caughtFish);
-          nextTrapPositionRef.current = calculateNextTrapPosition(
-            netX,
-            netY,
-            netWidth,
-            netHeight,
-            caughtFishRef.current.length
-          );
-          createSmokeEffect(caughtFish.x, caughtFish.y, smokeParticlesRef);
-          continue;
-        }
-
-        const result = processFishTrapping(
-          fish,
-          i,
-          netX,
-          netY,
-          netWidth,
-          netHeight,
-          currentTime,
-          nextTrapPositionRef.current,
-          caughtFishRef
+      // Apply detachment animation
+      if (gameEndedRef.current) {
+        const detachmentProgress = Math.min(
+          (currentTime - detachmentStartTimeRef.current) / 3000,
+          1
         );
+        const detachmentOffset = detachmentProgress * canvas.width * 1.5; // Move left off screen
+        netX -= detachmentOffset;
+      }
 
-        if (result.shouldRemove && result.caughtFish) {
-          // Fish is trapped - remove from active fish and add to caught fish
-          fishRef.current.splice(i, 1);
-          caughtFishRef.current.push(result.caughtFish);
-          nextTrapPositionRef.current = result.newTrapPosition;
-          createSmokeEffect(
-            result.caughtFish.x,
-            result.caughtFish.y,
-            smokeParticlesRef
+      // Calculate net deviation from base position for caught fish movement
+      const baseNetX = canvas.width * OCEAN_CONFIG.LAYOUT.NET_X_OFFSET_RATIO;
+      const baseNetY = canvas.height * OCEAN_CONFIG.LAYOUT.NET_Y_RATIO;
+      const netDeviationX = netX - baseNetX;
+      const netDeviationY = netY - baseNetY;
+
+      // Process each fish for trapping only during playing state
+      if (gameState === "playing") {
+        for (let i = fishRef.current.length - 1; i >= 0; i--) {
+          const fish = fishRef.current[i];
+
+          const result = processFishTrapping(
+            fish,
+            i,
+            netX,
+            netY,
+            netWidth,
+            netHeight,
+            currentTime,
+            nextTrapPositionRef.current,
+            caughtFishRef
           );
+
+          if (result.shouldRemove && result.caughtFish) {
+            // Fish is trapped - remove from active fish and add to caught fish
+            fishRef.current.splice(i, 1);
+            caughtFishRef.current.push(result.caughtFish);
+            nextTrapPositionRef.current = result.newTrapPosition;
+            createSmokeEffect(
+              result.caughtFish.x,
+              result.caughtFish.y,
+              smokeParticlesRef
+            );
+          }
         }
       }
 
       // Draw active fish
       fishRef.current.forEach((fish, index) => {
         drawFish(ctx, fish, fishImageRef.current, index);
-
-        // Draw trap position indicator for fish that are being trapped
-        if (fish.isBlurred && fish.targetTrapPosition) {
-          drawTrapPositionIndicator(ctx, fish.targetTrapPosition, index);
-        }
       });
 
-      // Draw caught fish
+      // Draw caught fish with net hovering movement
       caughtFishRef.current.forEach((fish, index) => {
-        drawCaughtFish(ctx, fish, fishImageRef.current, currentTime, index);
+        // Apply net deviation to caught fish positions
+        let adjustedFish = {
+          ...fish,
+          x: fish.x + netDeviationX,
+          y: fish.y + netDeviationY,
+        };
+
+        // Apply detachment animation to caught fish
+        if (gameEndedRef.current) {
+          const detachmentProgress = Math.min(
+            (currentTime - detachmentStartTimeRef.current) / 3000,
+            1
+          );
+          const detachmentOffset = detachmentProgress * canvas.width * 1.5;
+          adjustedFish.x -= detachmentOffset;
+        }
+
+        drawCaughtFish(
+          ctx,
+          adjustedFish,
+          fishImageRef.current,
+          currentTime,
+          index
+        );
       });
 
       // Update and draw smoke particles
@@ -274,11 +316,24 @@ const OceanScene: React.FC = () => {
         );
       }
 
-      // Draw fishing net
-      drawFishingNet(ctx, canvas.width, canvas.height, currentTime);
+      // Draw fishing net with detachment animation
+      if (!gameEndedRef.current) {
+        drawFishingNet(ctx, canvas.width, canvas.height, currentTime);
+      } else {
+        // Draw detached net flowing left
+        const detachmentProgress = Math.min(
+          (currentTime - detachmentStartTimeRef.current) / 3000,
+          1
+        );
+        const detachmentOffset = detachmentProgress * canvas.width * 1.5;
+        ctx.save();
+        ctx.translate(-detachmentOffset, 0);
+        drawFishingNet(ctx, canvas.width, canvas.height, currentTime);
+        ctx.restore();
+      }
 
-      // Draw parabola debug outline
-      drawParabolaDebug(ctx, netX, netY, netWidth, netHeight);
+      // Draw parabola debug outline - REMOVED
+      // drawParabolaDebug(ctx, netX, netY, netWidth, netHeight);
 
       // Draw fish count
       drawFishCount(
@@ -287,6 +342,22 @@ const OceanScene: React.FC = () => {
         caughtFishRef.current.length,
         currentTime
       );
+
+      // Draw game timer with background
+      const remainingTime = Math.max(0, 10 - gameTimeSeconds);
+      const timerText = `Time: ${remainingTime}s`;
+      const timerX = canvas.width / 2;
+      const timerY = 50;
+
+      // Draw background for timer
+      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      ctx.fillRect(timerX - 80, timerY - 30, 160, 40);
+
+      // Draw timer text
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 24px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(timerText, timerX, timerY);
 
       animationIdRef.current = requestAnimationFrame(animate);
     };
@@ -323,6 +394,70 @@ const OceanScene: React.FC = () => {
           cursor: "default",
         }}
       />
+
+      {/* Game Over Screen */}
+      {gameState === "gameOver" && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0, 0, 0, 0.8)",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            color: "white",
+            fontFamily: "Arial, sans-serif",
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "48px",
+              marginBottom: "20px",
+              textAlign: "center",
+            }}
+          >
+            Game Over!
+          </h1>
+          <h2
+            style={{
+              fontSize: "32px",
+              marginBottom: "40px",
+              textAlign: "center",
+            }}
+          >
+            You caught {finalFishCount} fish!
+          </h2>
+          <button
+            onClick={() => {
+              setGameState("playing");
+              setGameTime(0);
+              setFinalFishCount(0);
+              fishRef.current = [];
+              caughtFishRef.current = [];
+              smokeParticlesRef.current = [];
+              nextTrapPositionRef.current = null;
+              gameStartTimeRef.current = 0; // Reset game timer
+              gameEndedRef.current = false; // Reset game ended flag
+            }}
+            style={{
+              padding: "15px 30px",
+              fontSize: "24px",
+              backgroundColor: "#4CAF50",
+              color: "white",
+              border: "none",
+              borderRadius: "8px",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            Play Again
+          </button>
+        </div>
+      )}
     </div>
   );
 };

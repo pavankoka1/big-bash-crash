@@ -11,14 +11,7 @@ export const drawFish = (
   const drawX = fish.x;
   const drawY = fish.y;
 
-  // Debug logging for fish in net
-  if (fish.isBlurred && index === 0) {
-    console.log(
-      `Drawing fish ${index}: x=${drawX.toFixed(1)}, y=${drawY.toFixed(
-        1
-      )}, size=${fish.size.toFixed(1)}`
-    );
-  }
+  // Removed debug logging for performance
 
   ctx.save();
   ctx.globalAlpha = fish.opacity;
@@ -51,14 +44,7 @@ export const drawCaughtFish = (
     5
   );
 
-  // Debug logging for caught fish
-  if (index === 0) {
-    console.log(
-      `🎣 Drawing caught fish ${index}: x=${fish.x.toFixed(
-        1
-      )}, y=${fish.y.toFixed(1)}, size=${fish.size.toFixed(1)}`
-    );
-  }
+  // Removed debug logging for performance
 
   ctx.save();
   ctx.globalAlpha = fish.opacity * OCEAN_CONFIG.FISH.CAUGHT_OPACITY_MULTIPLIER;
@@ -125,10 +111,7 @@ export const drawFishCount = (
   const textX = canvasWidth - OCEAN_CONFIG.UI.TEXT_OFFSET_X;
   const textY = OCEAN_CONFIG.UI.TEXT_OFFSET_Y;
 
-  // Debug logging every 2 seconds
-  if (Math.floor(currentTime / 1000) % 2 === 0) {
-    console.log(`Current fish count: ${fishCount}`);
-  }
+  // Removed debug logging for performance
 
   // Draw text with outline
   ctx.strokeText(countText, textX, textY);

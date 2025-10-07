@@ -242,7 +242,7 @@ export const drawFishingNet = (
     ctx.beginPath();
     ctx.moveTo(netX, y);
 
-    for (let x = netX; x <= rectRightX; x += 4) {
+    for (let x = netX; x <= rectRightX; x += 6) {
       const waveDistortion =
         Math.sin(
           (x - netX) * OCEAN_CONFIG.NET.WAVE_DISTORTION_FREQUENCY_X +
@@ -264,7 +264,7 @@ export const drawFishingNet = (
     ctx.beginPath();
     ctx.moveTo(x, rectTopY);
 
-    for (let y = rectTopY; y <= rectBottomY; y += 4) {
+    for (let y = rectTopY; y <= rectBottomY; y += 6) {
       const waveDistortion =
         Math.sin(
           (y - rectTopY) * OCEAN_CONFIG.NET.WAVE_DISTORTION_FREQUENCY_Y +
@@ -340,4 +340,3 @@ const drawNetPole = (
   ctx.quadraticCurveTo(poleMidX, poleMidY, poleEndX, poleEndY);
   ctx.stroke();
 };
-

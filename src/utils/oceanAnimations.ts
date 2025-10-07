@@ -1,6 +1,10 @@
 import { OCEAN_CONFIG, WAVE_CALCULATIONS } from "../constants/oceanConstants";
 
+// Static counter for fish IDs
+let fishIdCounter = 0;
+
 export interface Fish {
+  id: number;
   x: number;
   y: number;
   size: number;
@@ -11,6 +15,7 @@ export interface Fish {
   isBlurred?: boolean;
   isBeingTrapped?: boolean;
   targetTrapPosition?: { x: number; y: number };
+  swimPhase?: number;
   caughtPosition?: {
     x: number;
     y: number;
@@ -26,6 +31,8 @@ export interface SmokeParticle {
   life: number;
   maxLife: number;
   size: number;
+  initialSize: number;
+  windEffect: number;
 }
 
 export interface Wave {
@@ -293,6 +300,7 @@ export const createFish = (
 
   while (attempts < maxAttempts) {
     const newFish: Fish = {
+      id: ++fishIdCounter,
       x: canvasWidth + OCEAN_CONFIG.FISH.SPAWN_OFFSET,
       y: canvasHeight * 0.5 + Math.random() * (canvasHeight * 0.4),
       size:
@@ -330,6 +338,7 @@ export const createFish = (
 
   // Fallback
   return {
+    id: ++fishIdCounter,
     x: canvasWidth + OCEAN_CONFIG.FISH.SPAWN_OFFSET,
     y: canvasHeight * 0.5 + Math.random() * (canvasHeight * 0.4),
     size:
@@ -353,7 +362,15 @@ export const createFish = (
 export const updateFishPositions = (fish: Fish[]): Fish[] => {
   return fish
     .map((fish) => {
-      fish.x -= fish.speed;
+      // Only update position if fish is not being trapped AND not blurred
+      if (!fish.isBeingTrapped && !fish.isBlurred) {
+        fish.x -= fish.speed;
+
+        // Add gentle vertical swimming motion
+        const swimPhase = fish.swimPhase || 0;
+        fish.swimPhase = (fish.swimPhase || 0) + 0.02;
+        fish.y += Math.sin(swimPhase) * 0.5;
+      }
       return fish;
     })
     .filter((fish) => fish.x > -fish.size);
@@ -429,51 +446,51 @@ export const calculateNextTrapPosition = (
   // Fish should be arranged in a natural pattern within the parabola
 
   if (caughtFishCount === 0) {
-    // First fish: near the vertex
-    return { x: vertexX + 10, y: vertexY };
+    // First fish: well inside the parabola
+    return { x: vertexX + 25, y: vertexY };
   }
 
   if (caughtFishCount === 1) {
-    // Second fish: slightly right and below vertex
-    const x = vertexX + 20;
-    const y = vertexY + 15;
+    // Second fish: further inside parabola
+    const x = vertexX + 35;
+    const y = vertexY + 10;
     return { x, y };
   }
 
   if (caughtFishCount === 2) {
-    // Third fish: to the right of first fish
-    const x = vertexX + 30;
+    // Third fish: well inside parabola
+    const x = vertexX + 45;
     const y = vertexY;
     return { x, y };
   }
 
   if (caughtFishCount === 3) {
-    // Fourth fish: above the third fish
-    const x = vertexX + 30;
-    const y = vertexY - 15;
+    // Fourth fish: well inside parabola
+    const x = vertexX + 45;
+    const y = vertexY - 10;
     return { x, y };
   }
 
-  // For more fish, create a spiral pattern within the parabola
-  const spiralRadius = 8 + (caughtFishCount - 4) * 3; // Increasing radius
+  // For more fish, create a spiral pattern well inside the parabola
+  const spiralRadius = 5 + (caughtFishCount - 4) * 2; // Smaller radius, well inside
   const angle = (caughtFishCount - 4) * 0.8; // Spiral angle
 
-  // Calculate position along the parabola curve
-  const baseX = vertexX + 40 + spiralRadius * Math.cos(angle);
+  // Calculate position well inside the parabola
+  const baseX = vertexX + 55 + spiralRadius * Math.cos(angle);
   const baseY = vertexY + spiralRadius * Math.sin(angle);
 
   // Ensure the position follows the parabola curve
   const parabolaTopY = vertexY - Math.sqrt(4 * a * (baseX - vertexX));
   const parabolaBottomY = vertexY + Math.sqrt(4 * a * (baseX - vertexX));
 
-  // Clamp Y position to stay within parabola bounds
+  // Clamp Y position to stay well within parabola bounds (more margin)
   const clampedY = Math.max(
-    parabolaTopY + 5,
-    Math.min(parabolaBottomY - 5, baseY)
+    parabolaTopY + 15,
+    Math.min(parabolaBottomY - 15, baseY)
   );
 
-  // Ensure X position is within bounds
-  const clampedX = Math.max(vertexX + 5, Math.min(rectRightX - 10, baseX));
+  // Ensure X position is well within bounds
+  const clampedX = Math.max(vertexX + 15, Math.min(rectRightX - 20, baseX));
 
   return { x: clampedX, y: clampedY };
 };
@@ -520,37 +537,17 @@ export const processFishTrapping = (
     // 1. Horizontal containment - prevent left/right escape
     if (fish.x < rectLeftX) {
       fish.x = rectLeftX + 5; // Force back into net
-      console.log(
-        `Fish ${index} tried to escape left! Forced back to x=${fish.x.toFixed(
-          1
-        )}`
-      );
     }
     if (fish.x > rectRightX) {
       fish.x = rectRightX - OCEAN_CONFIG.FISH.ESCAPE_PREVENTION_OFFSET;
-      console.log(
-        `Fish ${index} tried to escape right! Forced back to x=${fish.x.toFixed(
-          1
-        )}`
-      );
     }
 
     // 2. Vertical containment - prevent top/bottom escape
     if (fish.y < rectTopY) {
       fish.y = rectTopY + 5; // Force back into net
-      console.log(
-        `Fish ${index} tried to escape up! Forced back to y=${fish.y.toFixed(
-          1
-        )}`
-      );
     }
     if (fish.y > rectBottomY) {
       fish.y = rectBottomY - 5; // Force back into net
-      console.log(
-        `Fish ${index} tried to escape down! Forced back to y=${fish.y.toFixed(
-          1
-        )}`
-      );
     }
 
     // 3. Parabola boundary enforcement - ensure fish stays within parabolic net
@@ -565,19 +562,9 @@ export const processFishTrapping = (
     // Force fish to stay within parabola boundaries
     if (fish.y < parabolaTopY) {
       fish.y = parabolaTopY + 2;
-      console.log(
-        `Fish ${index} tried to escape parabola top! Forced back to y=${fish.y.toFixed(
-          1
-        )}`
-      );
     }
     if (fish.y > parabolaBottomY) {
       fish.y = parabolaBottomY - 2;
-      console.log(
-        `Fish ${index} tried to escape parabola bottom! Forced back to y=${fish.y.toFixed(
-          1
-        )}`
-      );
     }
 
     // 4. SMOOTH TRAPPING - If fish is inside net, start trapping process smoothly
@@ -593,11 +580,6 @@ export const processFishTrapping = (
         netHeight,
         caughtFishRef.current.length
       );
-      console.log(
-        `Fish ${index} starting smooth trap to position: x=${fish.targetTrapPosition.x.toFixed(
-          1
-        )}, y=${fish.targetTrapPosition.y.toFixed(1)}`
-      );
     }
 
     const trapPos = fish.targetTrapPosition!;
@@ -605,20 +587,24 @@ export const processFishTrapping = (
     const dirY = trapPos.y - fish.y;
     const distance = Math.sqrt(dirX * dirX + dirY * dirY);
 
-    // Move fish towards trap position with ULTRA smooth, gradual movement
+    // Move fish towards trap position with smooth, natural movement
     if (distance > 0) {
       const normalizedDirX = dirX / distance;
       const normalizedDirY = dirY / distance;
 
-      // ULTRA smooth movement - very slow approach
-      const approachSpeed = Math.min(fish.speed * 0.15, distance * 0.01); // Very slow approach
+      // Move at the same speed as normal swimming
+      const approachSpeed = fish.speed / 2; // Same speed as normal movement
 
       fish.x += normalizedDirX * approachSpeed;
       fish.y += normalizedDirY * approachSpeed;
 
-      // Add very gentle curve to the movement for more natural path
-      const curveOffset = Math.sin(currentTime * 0.003 + index) * 0.5; // Very subtle curve
-      fish.y += curveOffset * 0.02;
+      // Add gentle swimming motion for more natural movement
+      const swimOffset = Math.sin(currentTime * 0.005 + index) * 2; // Gentle swimming
+      fish.y += swimOffset * 0.1;
+
+      // Add slight horizontal drift for more realistic movement
+      const driftOffset = Math.cos(currentTime * 0.003 + index) * 1;
+      fish.x += driftOffset * 0.05;
     }
 
     // Check if fish has reached the trap position
@@ -626,7 +612,6 @@ export const processFishTrapping = (
 
     if (hasReachedTrap) {
       // Fish reached the trap position - NOW IT'S TRAPPED!
-      console.log(`Fish ${index} reached trap position! Trapping...`);
 
       const caughtFish = {
         ...fish,
@@ -644,19 +629,18 @@ export const processFishTrapping = (
         caughtFishRef.current.length + 1
       );
 
-      console.log(
-        `🎣 FISH TRAPPED! Fish ${index} at position: x=${trapPos.x.toFixed(
-          1
-        )}, y=${trapPos.y.toFixed(1)}`
-      );
-
       return { shouldRemove: true, newTrapPosition, caughtFish };
     }
   } else {
-    // Fish is outside net - normal movement
-    fish.isBlurred = false;
-    fish.isBeingTrapped = false;
-    fish.targetTrapPosition = undefined;
+    // Fish is outside net - only reset if it was never being trapped
+    if (!fish.isBeingTrapped) {
+      fish.isBlurred = false;
+      fish.targetTrapPosition = undefined;
+    } else {
+      // Fish was being trapped but is now outside - this might be due to net hovering
+    }
+    // Keep isBeingTrapped = true if fish was already being trapped
+    // This prevents resetting due to net hovering movement
   }
 
   return { shouldRemove: false, newTrapPosition: nextTrapPosition };
@@ -669,24 +653,49 @@ export const createSmokeEffect = (
   smokeParticlesRef: React.MutableRefObject<SmokeParticle[]>
 ) => {
   for (let i = 0; i < OCEAN_CONFIG.SMOKE.PARTICLE_COUNT; i++) {
+    const initialSize =
+      OCEAN_CONFIG.SMOKE.SIZE_MIN +
+      Math.random() *
+        (OCEAN_CONFIG.SMOKE.SIZE_MAX - OCEAN_CONFIG.SMOKE.SIZE_MIN);
+
+    const particleX = x + (Math.random() - 0.5) * OCEAN_CONFIG.SMOKE.SPREAD;
+    const particleY = y + (Math.random() - 0.5) * OCEAN_CONFIG.SMOKE.SPREAD;
+    const particleVx =
+      (Math.random() - 0.5) * OCEAN_CONFIG.SMOKE.VELOCITY_X_RANGE;
+    const particleVy =
+      -Math.random() *
+        (OCEAN_CONFIG.SMOKE.VELOCITY_Y_MAX -
+          OCEAN_CONFIG.SMOKE.VELOCITY_Y_MIN) -
+      OCEAN_CONFIG.SMOKE.VELOCITY_Y_MIN;
+    const particleMaxLife =
+      OCEAN_CONFIG.SMOKE.LIFE_MIN +
+      Math.random() *
+        (OCEAN_CONFIG.SMOKE.LIFE_MAX - OCEAN_CONFIG.SMOKE.LIFE_MIN);
+    const particleWindEffect = Math.random() * OCEAN_CONFIG.SMOKE.WIND_EFFECT;
+
+    // Validate all values are finite
+    if (
+      !isFinite(particleX) ||
+      !isFinite(particleY) ||
+      !isFinite(particleVx) ||
+      !isFinite(particleVy) ||
+      !isFinite(particleMaxLife) ||
+      !isFinite(particleWindEffect) ||
+      !isFinite(initialSize)
+    ) {
+      continue; // Skip this particle if any value is invalid
+    }
+
     const particle: SmokeParticle = {
-      x: x + (Math.random() - 0.5) * OCEAN_CONFIG.SMOKE.SPREAD,
-      y: y + (Math.random() - 0.5) * OCEAN_CONFIG.SMOKE.SPREAD,
-      vx: (Math.random() - 0.5) * OCEAN_CONFIG.SMOKE.VELOCITY_X_RANGE,
-      vy:
-        -Math.random() *
-          (OCEAN_CONFIG.SMOKE.VELOCITY_Y_MAX -
-            OCEAN_CONFIG.SMOKE.VELOCITY_Y_MIN) -
-        OCEAN_CONFIG.SMOKE.VELOCITY_Y_MIN,
+      x: particleX,
+      y: particleY,
+      vx: particleVx,
+      vy: particleVy,
       life: 0,
-      maxLife:
-        OCEAN_CONFIG.SMOKE.LIFE_MIN +
-        Math.random() *
-          (OCEAN_CONFIG.SMOKE.LIFE_MAX - OCEAN_CONFIG.SMOKE.LIFE_MIN),
-      size:
-        OCEAN_CONFIG.SMOKE.SIZE_MIN +
-        Math.random() *
-          (OCEAN_CONFIG.SMOKE.SIZE_MAX - OCEAN_CONFIG.SMOKE.SIZE_MIN),
+      maxLife: particleMaxLife,
+      size: initialSize,
+      initialSize: initialSize,
+      windEffect: particleWindEffect,
     };
     smokeParticlesRef.current.push(particle);
   }
@@ -698,19 +707,88 @@ export const updateSmokeParticles = (
 ) => {
   return smokeParticles.filter((particle) => {
     particle.life++;
-    particle.x += particle.vx;
+
+    // Update position with wind effect
+    particle.x += particle.vx + particle.windEffect;
     particle.y += particle.vy;
 
-    const alpha = 1 - particle.life / particle.maxLife;
+    // Ensure positions are finite
+    if (!isFinite(particle.x) || !isFinite(particle.y)) {
+      return false; // Remove invalid particles
+    }
+
+    // Particles expand as they rise (like real smoke)
+    particle.size =
+      particle.initialSize + particle.life * OCEAN_CONFIG.SMOKE.EXPANSION_RATE;
+
+    // Ensure size is finite and within reasonable bounds
+    if (!isFinite(particle.size) || particle.size <= 0) {
+      particle.size = particle.initialSize;
+    }
+
+    // Cap maximum size to prevent performance issues
+    particle.size = Math.min(particle.size, particle.initialSize * 3);
+
+    // Calculate alpha with smooth fade
+    const alpha = Math.max(0, 1 - particle.life / particle.maxLife);
+    const smoothAlpha = alpha * alpha; // Quadratic fade for more realistic effect
 
     if (alpha <= 0) return false;
 
     ctx.save();
-    ctx.globalAlpha = alpha * OCEAN_CONFIG.SMOKE.ALPHA;
-    ctx.fillStyle = OCEAN_CONFIG.COLORS.SMOKE;
+    ctx.globalAlpha = smoothAlpha * OCEAN_CONFIG.SMOKE.ALPHA;
+
+    // Create more realistic smoke color gradient
+    // Ensure all values are finite before creating gradient
+    if (
+      !isFinite(particle.x) ||
+      !isFinite(particle.y) ||
+      !isFinite(particle.size)
+    ) {
+      return false; // Remove invalid particles
+    }
+
+    const gradient = ctx.createRadialGradient(
+      particle.x,
+      particle.y,
+      0,
+      particle.x,
+      particle.y,
+      particle.size
+    );
+    gradient.addColorStop(
+      0,
+      `rgba(80, 80, 80, ${smoothAlpha * OCEAN_CONFIG.SMOKE.ALPHA})`
+    );
+    gradient.addColorStop(
+      0.5,
+      `rgba(60, 60, 60, ${smoothAlpha * OCEAN_CONFIG.SMOKE.ALPHA * 0.7})`
+    );
+    gradient.addColorStop(
+      1,
+      `rgba(40, 40, 40, ${smoothAlpha * OCEAN_CONFIG.SMOKE.ALPHA * 0.3})`
+    );
+
+    ctx.fillStyle = gradient;
+
+    // Draw irregular smoke shape instead of perfect circle
     ctx.beginPath();
-    ctx.arc(particle.x, particle.y, particle.size, 0, 2 * Math.PI);
+    const irregularity = 0.3;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * 2 * Math.PI;
+      const radius = particle.size * (1 + Math.random() * irregularity);
+      const x = particle.x + Math.cos(angle) * radius;
+      const y = particle.y + Math.sin(angle) * radius;
+
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.closePath();
     ctx.fill();
+
     ctx.restore();
 
     return particle.life < particle.maxLife;
