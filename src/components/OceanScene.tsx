@@ -64,6 +64,7 @@ const OceanScene: React.FC = () => {
   const gameStartTimeRef = useRef<number>(0);
   const detachmentStartTimeRef = useRef<number>(0);
   const gameEndedRef = useRef<boolean>(false);
+  const [animationKey, setAnimationKey] = useState(0); // Force animation restart
 
   // Generate random game duration on mount
   useEffect(() => {
@@ -79,7 +80,6 @@ const OceanScene: React.FC = () => {
   useEffect(() => {
     if (gameState === "detaching") {
       const timer = setTimeout(() => {
-        console.log("🎮 Switching to game over state via useEffect");
         setGameState("gameOver");
       }, 1500); // 1.5 seconds
 
@@ -215,7 +215,6 @@ const OceanScene: React.FC = () => {
         setGameState("detaching");
         setFinalFishCount(caughtFishRef.current.length);
         detachmentStartTimeRef.current = currentTime;
-        console.log("🎮 Game ending - switching to detaching state");
       }
 
       // Detachment animation is handled by useEffect
@@ -415,7 +414,7 @@ const OceanScene: React.FC = () => {
       }
       window.removeEventListener("resize", resizeCanvas);
     };
-  }, [imagesLoaded, waves, isCalculating]);
+  }, [imagesLoaded, waves, isCalculating, animationKey]);
 
   return (
     <div
@@ -545,6 +544,7 @@ const OceanScene: React.FC = () => {
               nextTrapPositionRef.current = null;
               gameStartTimeRef.current = 0; // Reset game timer
               gameEndedRef.current = false; // Reset game ended flag
+              setAnimationKey((prev) => prev + 1); // Force animation restart
             }}
             style={{
               padding: "15px 30px",
