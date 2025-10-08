@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { OCEAN_CONFIG } from "../constants/oceanConstants";
+import { GAME_TIMING, OCEAN_CONFIG } from "../constants/oceanConstants";
 import { drawBoat, drawFishingNet } from "../utils/boatAndNet";
 import { drawCaughtFish, drawFish, drawFishCount } from "../utils/fishDrawing";
 import {
@@ -36,9 +36,21 @@ const OceanScene: React.FC = () => {
   >("playing");
   const [gameTime, setGameTime] = useState(0);
   const [finalFishCount, setFinalFishCount] = useState(0);
+  const [gameDuration, setGameDuration] = useState(0); // Random duration between 15-20 seconds
   const gameStartTimeRef = useRef<number>(0);
   const detachmentStartTimeRef = useRef<number>(0);
   const gameEndedRef = useRef<boolean>(false);
+
+  // Generate random game duration on mount
+  useEffect(() => {
+    const randomDuration =
+      Math.floor(
+        Math.random() *
+          (GAME_TIMING.GAME_DURATION_MAX - GAME_TIMING.GAME_DURATION_MIN + 1)
+      ) + GAME_TIMING.GAME_DURATION_MIN;
+    setGameDuration(randomDuration);
+    console.log(`🎮 Game duration set to: ${randomDuration} seconds`);
+  }, []);
 
   // Load images
   useEffect(() => {
@@ -160,10 +172,10 @@ const OceanScene: React.FC = () => {
         );
       }
 
-      // Check if 10 seconds have passed
-      if (gameTimeSeconds >= 10 && !gameEndedRef.current) {
+      // Check if game duration has passed
+      if (gameTimeSeconds >= gameDuration && !gameEndedRef.current) {
         console.log(
-          `🎮 GAME ENDING! Time: ${gameTimeSeconds}s, State: ${gameState}, gameEnded: ${gameEndedRef.current}`
+          `🎮 GAME ENDING! Time: ${gameTimeSeconds}s/${gameDuration}s, State: ${gameState}, gameEnded: ${gameEndedRef.current}`
         );
         gameEndedRef.current = true;
         setGameState("detaching");
@@ -171,10 +183,11 @@ const OceanScene: React.FC = () => {
         detachmentStartTimeRef.current = currentTime;
       }
 
-      // Check if detachment animation is complete (3 seconds)
+      // Check if detachment animation is complete
       if (
         gameEndedRef.current &&
-        currentTime - detachmentStartTimeRef.current > 3000
+        currentTime - detachmentStartTimeRef.current >
+          GAME_TIMING.DETACHMENT_DURATION
       ) {
         setGameState("gameOver");
       }
@@ -221,7 +234,8 @@ const OceanScene: React.FC = () => {
       // Apply detachment animation
       if (gameEndedRef.current) {
         const detachmentProgress = Math.min(
-          (currentTime - detachmentStartTimeRef.current) / 3000,
+          (currentTime - detachmentStartTimeRef.current) /
+            GAME_TIMING.DETACHMENT_DURATION,
           1
         );
         const detachmentOffset = detachmentProgress * canvas.width * 1.5; // Move left off screen
@@ -282,7 +296,8 @@ const OceanScene: React.FC = () => {
         // Apply detachment animation to caught fish
         if (gameEndedRef.current) {
           const detachmentProgress = Math.min(
-            (currentTime - detachmentStartTimeRef.current) / 3000,
+            (currentTime - detachmentStartTimeRef.current) /
+              GAME_TIMING.DETACHMENT_DURATION,
             1
           );
           const detachmentOffset = detachmentProgress * canvas.width * 1.5;
@@ -322,7 +337,8 @@ const OceanScene: React.FC = () => {
       } else {
         // Draw detached net flowing left
         const detachmentProgress = Math.min(
-          (currentTime - detachmentStartTimeRef.current) / 3000,
+          (currentTime - detachmentStartTimeRef.current) /
+            GAME_TIMING.DETACHMENT_DURATION,
           1
         );
         const detachmentOffset = detachmentProgress * canvas.width * 1.5;
@@ -344,7 +360,7 @@ const OceanScene: React.FC = () => {
       );
 
       // Draw game timer with background
-      const remainingTime = Math.max(0, 10 - gameTimeSeconds);
+      const remainingTime = Math.max(0, gameDuration - gameTimeSeconds);
       const timerText = `Time: ${remainingTime}s`;
       const timerX = canvas.width / 2;
       const timerY = 50;
@@ -433,6 +449,17 @@ const OceanScene: React.FC = () => {
           </h2>
           <button
             onClick={() => {
+              // Generate new random game duration
+              const newDuration =
+                Math.floor(
+                  Math.random() *
+                    (GAME_TIMING.GAME_DURATION_MAX -
+                      GAME_TIMING.GAME_DURATION_MIN +
+                      1)
+                ) + GAME_TIMING.GAME_DURATION_MIN;
+              setGameDuration(newDuration);
+              console.log(`🎮 New game duration: ${newDuration} seconds`);
+
               setGameState("playing");
               setGameTime(0);
               setFinalFishCount(0);

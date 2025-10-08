@@ -2,10 +2,10 @@
 export const OCEAN_CONFIG = {
   // Canvas and rendering
   CANVAS: {
-    FISH_SPAWN_INTERVAL: 1200, // ms - increased for better performance
+    FISH_SPAWN_INTERVAL: 800, // ms - increased fish spawn rate
     WAVE_DAMPING: 0.08,
     BOAT_HOVER_DAMPING: 0.15,
-    FISH_COUNT_INITIAL: 4, // reduced for better performance
+    FISH_COUNT_INITIAL: 6, // increased initial fish count
     MAX_FISH_ATTEMPTS: 10,
   },
 
@@ -153,6 +153,13 @@ export const ANIMATION_TIMING = {
   ATMOSPHERIC_SPEED: 0.003,
   NET_WAVE_SPEED: 0.01,
   FISH_BLUR_SPEED: 0.01,
+} as const;
+
+// Game timing constants
+export const GAME_TIMING = {
+  GAME_DURATION_MIN: 15, // seconds
+  GAME_DURATION_MAX: 20, // seconds
+  DETACHMENT_DURATION: 3000, // ms - 3 seconds for net detachment animation
 } as const;
 
 // Wave calculation helpers

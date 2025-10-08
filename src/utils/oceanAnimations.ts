@@ -593,7 +593,7 @@ export const processFishTrapping = (
       const normalizedDirY = dirY / distance;
 
       // Move at the same speed as normal swimming
-      const approachSpeed = fish.speed / 2; // Same speed as normal movement
+      const approachSpeed = fish.speed; // Same speed as normal movement
 
       fish.x += normalizedDirX * approachSpeed;
       fish.y += normalizedDirY * approachSpeed;
