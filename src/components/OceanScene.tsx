@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { GAME_TIMING, OCEAN_CONFIG } from "../constants/oceanConstants";
+import { useFPS } from "../hooks/useFPS";
 import { drawBoat, drawFishingNet } from "../utils/boatAndNet";
 import { drawCaughtFish, drawFish, drawFishCount } from "../utils/fishDrawing";
 import {
@@ -17,26 +18,49 @@ import {
   updateFishPositions,
   updateSmokeParticles,
 } from "../utils/oceanAnimations";
+import FPSLoader from "./FPSLoader";
 
+/**
+ * OceanScene Component
+ *
+ * Main game component that renders the ocean fishing game with:
+ * - Animated ocean waves and sky
+ * - Fish spawning and movement
+ * - Fishing net with parabolic trap
+ * - Fish catching mechanics
+ * - Game timer and state management
+ * - FPS calculation and normalization
+ */
 const OceanScene: React.FC = () => {
+  // Canvas and rendering refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationIdRef = useRef<number | null>(null);
   const fishImageRef = useRef<HTMLImageElement | null>(null);
   const boatImageRef = useRef<HTMLImageElement | null>(null);
+
+  // Game entities
   const fishRef = useRef<Fish[]>([]);
   const caughtFishRef = useRef<Fish[]>([]);
   const smokeParticlesRef = useRef<SmokeParticle[]>([]);
-  const [waves, setWaves] = useState<Wave[]>([]);
-  const [imagesLoaded, setImagesLoaded] = useState(false);
   const nextTrapPositionRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Game state
+  // UI state
+  const [waves, setWaves] = useState<Wave[]>([]);
+  const [imagesLoaded, setImagesLoaded] = useState(false);
+
+  // FPS calculation and frame rate normalization
+  const { fps, isCalculating, progress, resetFPS, getFrameRateMultiplier } =
+    useFPS();
+
+  // Game state management
   const [gameState, setGameState] = useState<
     "playing" | "detaching" | "gameOver"
   >("playing");
   const [gameTime, setGameTime] = useState(0);
   const [finalFishCount, setFinalFishCount] = useState(0);
-  const [gameDuration, setGameDuration] = useState(0); // Random duration between 15-20 seconds
+  const [gameDuration, setGameDuration] = useState(0);
+
+  // Game timing refs
   const gameStartTimeRef = useRef<number>(0);
   const detachmentStartTimeRef = useRef<number>(0);
   const gameEndedRef = useRef<boolean>(false);
@@ -49,8 +73,19 @@ const OceanScene: React.FC = () => {
           (GAME_TIMING.GAME_DURATION_MAX - GAME_TIMING.GAME_DURATION_MIN + 1)
       ) + GAME_TIMING.GAME_DURATION_MIN;
     setGameDuration(randomDuration);
-    console.log(`🎮 Game duration set to: ${randomDuration} seconds`);
   }, []);
+
+  // Handle game over transition after detachment
+  useEffect(() => {
+    if (gameState === "detaching") {
+      const timer = setTimeout(() => {
+        console.log("🎮 Switching to game over state via useEffect");
+        setGameState("gameOver");
+      }, 1500); // 1.5 seconds
+
+      return () => clearTimeout(timer);
+    }
+  }, [gameState]);
 
   // Load images
   useEffect(() => {
@@ -62,7 +97,6 @@ const OceanScene: React.FC = () => {
         const fishPromise = new Promise<void>((resolve, reject) => {
           fishImg.onload = () => {
             fishImageRef.current = fishImg;
-            console.log("Fish image loaded successfully");
             resolve();
           };
           fishImg.onerror = () => {
@@ -75,7 +109,6 @@ const OceanScene: React.FC = () => {
         const boatPromise = new Promise<void>((resolve, reject) => {
           boatImg.onload = () => {
             boatImageRef.current = boatImg;
-            console.log("Boat image loaded successfully");
             resolve();
           };
           boatImg.onerror = () => {
@@ -87,7 +120,6 @@ const OceanScene: React.FC = () => {
 
         await Promise.all([fishPromise, boatPromise]);
         setImagesLoaded(true);
-        console.log("All images loaded successfully");
       } catch (error) {
         console.error("Failed to load images:", error);
         // Still set images loaded to true to show the scene even without images
@@ -126,7 +158,7 @@ const OceanScene: React.FC = () => {
 
   // Animation loop
   useEffect(() => {
-    if (!imagesLoaded) return;
+    if (!imagesLoaded || isCalculating) return;
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -154,43 +186,39 @@ const OceanScene: React.FC = () => {
     let lastFishSpawn = 0;
     const fishSpawnInterval = OCEAN_CONFIG.CANVAS.FISH_SPAWN_INTERVAL;
 
+    /**
+     * Main animation loop
+     * Handles game timing, state transitions, and rendering
+     */
     const animate = (currentTime: number) => {
       // Initialize game timer on first frame
       if (gameStartTimeRef.current === 0) {
         gameStartTimeRef.current = currentTime;
       }
 
-      // Calculate game time
-      const elapsedTime = currentTime - gameStartTimeRef.current;
-      const gameTimeSeconds = Math.floor(elapsedTime / 1000);
+      // Calculate frame rate multiplier for consistent game speed across devices
+      const frameRateMultiplier = getFrameRateMultiplier();
 
-      // Update game time state
+      // Calculate normalized game time (ensures consistent timing regardless of FPS)
+      const elapsedTime = currentTime - gameStartTimeRef.current;
+      const normalizedElapsedTime = elapsedTime * frameRateMultiplier;
+      const gameTimeSeconds = Math.floor(normalizedElapsedTime / 1000);
+
+      // Update game time state for UI display
       if (gameTimeSeconds !== gameTime) {
         setGameTime(gameTimeSeconds);
-        console.log(
-          `Timer: ${gameTimeSeconds}s (elapsed: ${elapsedTime}ms), State: ${gameState}`
-        );
       }
 
-      // Check if game duration has passed
+      // Check if game duration has passed and trigger detachment
       if (gameTimeSeconds >= gameDuration && !gameEndedRef.current) {
-        console.log(
-          `🎮 GAME ENDING! Time: ${gameTimeSeconds}s/${gameDuration}s, State: ${gameState}, gameEnded: ${gameEndedRef.current}`
-        );
         gameEndedRef.current = true;
         setGameState("detaching");
         setFinalFishCount(caughtFishRef.current.length);
         detachmentStartTimeRef.current = currentTime;
+        console.log("🎮 Game ending - switching to detaching state");
       }
 
-      // Check if detachment animation is complete
-      if (
-        gameEndedRef.current &&
-        currentTime - detachmentStartTimeRef.current >
-          GAME_TIMING.DETACHMENT_DURATION
-      ) {
-        setGameState("gameOver");
-      }
+      // Detachment animation is handled by useEffect
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -212,7 +240,7 @@ const OceanScene: React.FC = () => {
       // Spawn new fish only during playing state
       if (
         gameState === "playing" &&
-        currentTime - lastFishSpawn > fishSpawnInterval
+        elapsedTime - lastFishSpawn > fishSpawnInterval
       ) {
         const newFish = createFish(
           canvas.width,
@@ -220,7 +248,7 @@ const OceanScene: React.FC = () => {
           fishRef.current
         );
         fishRef.current.push(newFish);
-        lastFishSpawn = currentTime;
+        lastFishSpawn = elapsedTime;
       }
 
       // Process fish trapping and drawing
@@ -387,7 +415,7 @@ const OceanScene: React.FC = () => {
       }
       window.removeEventListener("resize", resizeCanvas);
     };
-  }, [imagesLoaded, waves]);
+  }, [imagesLoaded, waves, isCalculating]);
 
   return (
     <div
@@ -411,6 +439,54 @@ const OceanScene: React.FC = () => {
         }}
       />
 
+      {/* FPS Display - Top Left */}
+      {!isCalculating && fps > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "10px",
+            left: "10px",
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            color: "white",
+            padding: "8px 12px",
+            borderRadius: "6px",
+            fontFamily: "Arial, sans-serif",
+            fontSize: "14px",
+            fontWeight: "bold",
+            zIndex: 1000,
+          }}
+        >
+          FPS: {fps}
+        </div>
+      )}
+
+      {/* FPS Loader - shows while calculating FPS */}
+      <FPSLoader
+        isCalculating={isCalculating}
+        fps={fps}
+        progress={progress}
+        onReset={resetFPS}
+      />
+
+      {/* Debug: Show current game state */}
+      {process.env.NODE_ENV === "development" && (
+        <div
+          style={{
+            position: "absolute",
+            top: "10px",
+            right: "10px",
+            backgroundColor: "rgba(0,0,0,0.7)",
+            color: "white",
+            padding: "5px 10px",
+            borderRadius: "4px",
+            fontSize: "12px",
+            zIndex: 1001,
+          }}
+        >
+          State: {gameState} | Time: {gameTime}s/{gameDuration}s
+        </div>
+      )}
+
       {/* Game Over Screen */}
       {gameState === "gameOver" && (
         <div
@@ -427,6 +503,7 @@ const OceanScene: React.FC = () => {
             alignItems: "center",
             color: "white",
             fontFamily: "Arial, sans-serif",
+            zIndex: 10000,
           }}
         >
           <h1
@@ -458,7 +535,6 @@ const OceanScene: React.FC = () => {
                       1)
                 ) + GAME_TIMING.GAME_DURATION_MIN;
               setGameDuration(newDuration);
-              console.log(`🎮 New game duration: ${newDuration} seconds`);
 
               setGameState("playing");
               setGameTime(0);

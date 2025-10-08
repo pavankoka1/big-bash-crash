@@ -373,7 +373,7 @@ export const updateFishPositions = (fish: Fish[]): Fish[] => {
       }
       return fish;
     })
-    .filter((fish) => fish.x > -fish.size);
+    .filter((fish) => fish.x > -fish.size * 3); // Give fish reasonable time on screen
 };
 
 // Net calculations and drawing

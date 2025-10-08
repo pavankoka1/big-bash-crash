@@ -2,10 +2,10 @@
 export const OCEAN_CONFIG = {
   // Canvas and rendering
   CANVAS: {
-    FISH_SPAWN_INTERVAL: 800, // ms - increased fish spawn rate
+    FISH_SPAWN_INTERVAL: 1000, // ms - balanced fish spawn rate
     WAVE_DAMPING: 0.08,
     BOAT_HOVER_DAMPING: 0.15,
-    FISH_COUNT_INITIAL: 6, // increased initial fish count
+    FISH_COUNT_INITIAL: 5, // balanced initial fish count
     MAX_FISH_ATTEMPTS: 10,
   },
 
@@ -49,11 +49,11 @@ export const OCEAN_CONFIG = {
   FISH: {
     SIZE_MIN_RATIO: 0.02,
     SIZE_MAX_RATIO: 0.04,
-    SPEED_MIN: 3.0, // doubled from 1.5
-    SPEED_MAX: 6.0, // doubled from 3.0
+    SPEED_MIN: 2.5, // increased for better gameplay
+    SPEED_MAX: 4.5, // increased for better gameplay
     OPACITY_MIN: 0.6,
     OPACITY_MAX: 1.0,
-    SPAWN_OFFSET: 50,
+    SPAWN_OFFSET: 100,
     MIN_DISTANCE_MULTIPLIER: 2,
     BLUR_INTENSITY: 3,
     TRAP_DETECTION_RADIUS: 25,
@@ -160,6 +160,7 @@ export const GAME_TIMING = {
   GAME_DURATION_MIN: 15, // seconds
   GAME_DURATION_MAX: 20, // seconds
   DETACHMENT_DURATION: 3000, // ms - 3 seconds for net detachment animation
+  TARGET_FPS: 60, // Target FPS for frame rate normalization
 } as const;
 
 // Wave calculation helpers
